@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <title>Car Price Predictor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(to right, #e3f2fd, #fce4ec);
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
+
+    html[data-theme="dark"] body {
+      background: #121212;
+      color: #f1f1f1;
+    }
+
+    .card {
+      border: none;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      border-radius: 20px;
+    }
+
+    html[data-theme="dark"] .card {
+      background-color: #181818;
+      color: #f1f1f1;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    }
+
+    html[data-theme="dark"] .form-label,
+    html[data-theme="dark"] .form-control,
+    html[data-theme="dark"] .form-select {
+      background-color: #2b2b2b !important;
+      color: #ffffff !important;
+      border-color: #444;
+    }
+
+    html[data-theme="dark"] .form-control::placeholder {
+      color: #ccc !important;
+    }
+
+    html[data-theme="dark"] .btn-primary {
+      background-color: #0d6efd;
+    }
+
+    #result {
+      display: none;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    footer {
+      background: #212529;
+      color: #f8f9fa;
+    }
+
+    .theme-label {
+      color: white;
+      margin-left: 10px;
+    }
+
+    .navbar-nav {
+      align-items: center;
+    }
+
+    canvas {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4">
+  <a class="navbar-brand fw-bold" href="/">🚗 Car Price Predictor</a>
+  <div class="collapse navbar-collapse justify-content-end">
+    <ul class="navbar-nav align-items-center">
+      <li class="nav-item"><a class="nav-link active" href="/">Home</a></li>
+      <li class="nav-item">
+        <div class="form-check form-switch mb-0 ms-3">
+          <input class="form-check-input" type="checkbox" id="themeSwitch">
+          <label class="form-check-label theme-label" for="themeSwitch" id="themeLabel">🌙</label>
+        </div>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<div class="d-flex align-items-center justify-content-center" style="min-height: 85vh;">
+  <div class="card p-4 shadow-lg w-100" style="max-width: 600px;">
+    <h2 class="text-center mb-4"><i class="bi bi-speedometer2 me-2"></i>Car Price Predictor</h2>
+
+    <form id="car-form">
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-building me-1"></i>Company</label>
+        <select class="form-select" name="company" id="company" required>
+          {% for company in companies %}
+            <option value="{{ company }}">{{ company }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-car-front me-1"></i>Car Model</label>
+        <select class="form-select" name="car_model" id="car_model" required>
+          <option value="">Select a model</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-calendar me-1"></i>Year</label>
+        <select class="form-select" name="year" id="year" required>
+          {% for y in years %}
+            <option value="{{ y }}">{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-fuel-pump me-1"></i>Fuel Type</label>
+        <select class="form-select" name="fuel_type" id="fuel_type" required>
+          {% for fuel in fuel_types %}
+            <option value="{{ fuel }}">{{ fuel }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><i class="bi bi-speedometer me-1"></i>Kilometers Driven</label>
+        <input type="number" class="form-control" name="kilo_driven" id="kilo_driven" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100">
+        <i class="bi bi-graph-up-arrow me-1"></i> Predict Price
+      </button>
+
+      <div id="result" class="alert alert-success mt-3 text-center fw-semibold fs-5"></div>
+    </form>
+
+    <canvas id="priceTrendChart" class="mt-5" height="100"></canvas>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="text-center py-3 mt-4">
+  <small>&copy; 2025 Car Price Predictor | Built with ❤️ using Flask</small>
+</footer>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const themeSwitch = document.getElementById('themeSwitch');
+  const htmlEl = document.documentElement;
+  const themeLabel = document.getElementById('themeLabel');
+
+  function setTheme(theme) {
+    htmlEl.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+    themeLabel.textContent = theme === 'dark' ? '🌞' : '🌙';
+  }
+
+  themeSwitch.addEventListener('change', () => {
+    const newTheme = htmlEl.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+  });
+
+  setTheme(localStorage.getItem('theme') || 'light');
+
+  $('#company').on('change', function () {
+    const selectedCompany = $(this).val();
+    $.ajax({
+      url: '/get_car_models',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ company: selectedCompany }),
+      success: function (response) {
+        const carModelSelect = $('#car_model');
+        carModelSelect.empty().append('<option value="">Select a model</option>');
+        response.models.forEach(model => {
+          carModelSelect.append(new Option(model, model));
+        });
+      }
+    });
+  });
+
+  $('#car-form').on('submit', function (e) {
+    e.preventDefault();
+    const formData = {
+      company: $('#company').val(),
+      car_model: $('#car_model').val(),
+      year: $('#year').val(),
+      fuel_type: $('#fuel_type').val(),
+      kilo_driven: $('#kilo_driven').val()
+    };
+
+    $.ajax({
+      url: '/predict',
+      method: 'POST',
+      data: formData,
+      success: function (response) {
+        $('#result').removeClass('alert-danger').addClass('alert-success');
+        $('#result').text('Predicted Price: ₹' + response.price).fadeIn();
+      },
+      error: function () {
+        $('#result').removeClass('alert-success').addClass('alert-danger');
+        $('#result').text('Prediction failed. Please try again.').fadeIn();
+      }
+    });
+  });
+
+  // Chart.js integration
+  let trendChart;
+  function renderTrendChart(years, prices) {
+    const ctx = document.getElementById('priceTrendChart').getContext('2d');
+    if (trendChart) trendChart.destroy();
+
+    trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: years,
+        datasets: [{
+          label: 'Average Price (₹)',
+          data: prices,
+          borderColor: '#007bff',
+          backgroundColor: 'rgba(0, 123, 255, 0.1)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: true },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+          y: {
+            ticks: {
+              callback: (value) => `₹${value.toLocaleString()}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  $('#car_model').on('change', function () {
+    const selectedModel = $(this).val();
+    if (!selectedModel) return;
+
+    $.ajax({
+      url: '/price_trend',
+      method: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ car_model: selectedModel }),
+      success: function (response) {
+        if (response.years.length > 0) {
+          renderTrendChart(response.years, response.prices);
+        }
+      },
+      error: function () {
+        console.error('Failed to load trend data');
+      }
+    });
+  });
+</script>
+</body>
+</html>
